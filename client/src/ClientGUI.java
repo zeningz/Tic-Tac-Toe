@@ -19,10 +19,11 @@ public class ClientGUI {
     private JTextField playerNameInput;
     private JButton connectButton;
     private JLabel errorMessageLabel;
+    private JFrame waitingFrame;
+    private JLabel waitingLabel;
 
     public ClientGUI(Client client) {
         this.client = client;
-
         createPreGameFrame();
     }
 
@@ -39,41 +40,58 @@ public class ClientGUI {
         preGameFrame.setVisible(true);
 
         connectButton.addActionListener(e -> {
-            System.out.println("Connect button clicked!");
             String playerName = playerNameInput.getText();
             if (!playerName.isEmpty()) {
-                try {
-                    boolean success = client.connectToServer(playerName);
-                    if (success) {
-                        preGameFrame.dispose();
-                        createGameFrame();
-                    } else {
-                        errorMessageLabel.setText("Name already in use!");
-                    }
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    errorMessageLabel.setText("Error connecting to server!");
+                boolean success = client.connectToServer(playerName);
+                if (success) {
+                    preGameFrame.dispose();
+                    showWaitingScreen();
+                } else {
+                    errorMessageLabel.setText("Name already in use!");
                 }
             }
         });
-
     }
+
     public void displayError(String message) {
-        // 显示一个错误对话框或更新GUI以显示错误消息
         JOptionPane.showMessageDialog(frame, message, "Error", JOptionPane.ERROR_MESSAGE);
     }
 
-    private void createGameFrame() {
-        System.out.println("Creating game frame...");
+    public void createGameFrame() {
+        waitingFrame.dispose();
         frame = new JFrame("Tic Tac Toe");
         frame.setSize(600, 400);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLayout(new BorderLayout());
 
-        // ... [Rest of the game GUI initialization, same as your previous code]
+        // ... [Rest of the game GUI initialization]
 
         frame.setVisible(true);
-        System.out.println("Game frame should now be visible.");
+    }
+    public void closeWaitingScreen() {
+        if (preGameFrame != null) {
+            preGameFrame.dispose();
+            preGameFrame = null;
+        }
+    }
+
+    private void createWaitingForOpponentFrame() {
+        waitingFrame = new JFrame("Waiting...");
+        waitingFrame.setLayout(new FlowLayout());
+        waitingLabel = new JLabel("Waiting for your opponent...");
+        waitingFrame.add(waitingLabel);
+        waitingFrame.pack();
+        waitingFrame.setVisible(true);
+    }
+
+    public void showWaitingScreen() {
+        createWaitingForOpponentFrame();
+    }
+
+    public void hideWaitingScreen() {
+        if (waitingFrame != null) {
+            waitingFrame.dispose();
+        }
     }
 
     public void updateBoard(char[][] board) {

@@ -14,6 +14,8 @@ public class Player {
     public String getPlayerName() {
         return playerName;
     }
-
+    public ClientInterface getClientInterface() {
+        return this.clientInterface;
+    }
     // TODO: Add getters, setters, and other necessary methods.
 }

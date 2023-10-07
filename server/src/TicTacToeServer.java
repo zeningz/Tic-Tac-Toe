@@ -25,14 +25,18 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
         Player newPlayer = new Player(playerName, 'X', client);  // 假设默认符号是 'X'
         if (waitingPlayer == null) {
             waitingPlayer = newPlayer;
+            client.waitForOpponent();  // 通知玩家等待对手
             return true;  // 玩家已加入等待队列
         } else {
             GameSession newSession = new GameSession(waitingPlayer, newPlayer);
             activeSessions.add(newSession);
+            waitingPlayer.getClientInterface().startGame();  // 通知第一个玩家开始游戏
+            client.startGame();  // 通知第二个玩家开始游戏
             waitingPlayer = null;
             return true;  // 玩家已加入新的游戏会话
         }
     }
+
 
 
 
