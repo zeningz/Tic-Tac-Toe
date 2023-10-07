@@ -25,7 +25,7 @@ public class Client implements ClientInterface {
             server.setPlayer(clientStub, playerName);
             return true;
         } catch (RemoteException e) {
-            if (e.getMessage().contains("Name already in use")) {  // 修改这里，使用contains而不是equals
+            if (e.getMessage().contains("Name alrsseady in use")) {  // 修改这里，使用contains而不是equals
                 gui.displayError("Name already in use. Please choose a different name.");
                 return false;
             } else {
