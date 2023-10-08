@@ -1,3 +1,5 @@
+import java.rmi.RemoteException;
+
 public class GameSession {
     private Player player1;
     private Player player2;
@@ -8,7 +10,30 @@ public class GameSession {
         this.player1 = p1;
         this.player2 = p2;
         this.board = new char[3][3];
+        updateClientsBoard();
+        if (player1.getSymbol() == 'X') {
+            notifyPlayerToMove(player1);
+        } else {
+            notifyPlayerToMove(player2);
+        }
     }
+    private void updateClientsBoard() {
+        // Send the current board state to both players
+        try {
+            player1.getClientInterface().updateGame(board);
+            player2.getClientInterface().updateGame(board);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+    private void notifyPlayerToMove(Player player) {
+        try {
+            player.getClientInterface().yourTurn();
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+
     public enum GameState {
         ONGOING, FINISHED
     }

@@ -4,6 +4,8 @@ import java.rmi.server.UnicastRemoteObject;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+
 
 public class TicTacToeServer extends UnicastRemoteObject implements ServerInterface {
     private List<ClientInterface> connectedClients;
@@ -22,20 +24,30 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
             }
         }
 
-        Player newPlayer = new Player(playerName, 'X', client);  // 假设默认符号是 'X'
         if (waitingPlayer == null) {
-            waitingPlayer = newPlayer;
+            waitingPlayer = new Player(playerName, 'X', client);  // 默认符号是 'X'
             client.waitForOpponent();  // 通知玩家等待对手
             return true;  // 玩家已加入等待队列
         } else {
+            Random random = new Random();
+            char playerOneSymbol = random.nextBoolean() ? 'X' : 'O';
+            char playerTwoSymbol = playerOneSymbol == 'X' ? 'O' : 'X';
+
+            waitingPlayer.setSymbol(playerOneSymbol);
+            Player newPlayer = new Player(playerName, playerTwoSymbol, client);
+
+            System.out.println("Player 1: " + waitingPlayer.getPlayerName() + " using symbol: " + waitingPlayer.getSymbol());
+            System.out.println("Player 2: " + newPlayer.getPlayerName() + " using symbol: " + newPlayer.getSymbol());
+
             GameSession newSession = new GameSession(waitingPlayer, newPlayer);
             activeSessions.add(newSession);
-            waitingPlayer.getClientInterface().startGame();  // 通知第一个玩家开始游戏
-            client.startGame();  // 通知第二个玩家开始游戏
+
+
             waitingPlayer = null;
             return true;  // 玩家已加入新的游戏会话
         }
     }
+
 
 
 

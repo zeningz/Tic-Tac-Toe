@@ -70,15 +70,21 @@ public class Client implements ClientInterface {
     }
     public void sendMessage(String message) {
         try {
+            System.out.println("Attempting to send message: " + message);
             server.sendMessage(clientStub, message);
         } catch (RemoteException e) {
+            System.err.println("Error sending message: " + e.getMessage());
             e.printStackTrace();
         }
     }
-
+    public void yourTurn() {
+        gui.notifyYourTurn();
+    }
     public void receiveMessage(String message) {
+        System.out.println("Received message: " + message);
         gui.updateChat(message);
     }
+
 
     public void updateGame(char[][] board) {
         gui.updateBoard(board);

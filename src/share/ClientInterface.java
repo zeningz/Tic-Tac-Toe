@@ -8,6 +8,6 @@ public interface ClientInterface extends Remote {
     void receiveMessage(String message) throws RemoteException;
     void waitForOpponent() throws RemoteException;
     void startGame() throws RemoteException;
-
+    void yourTurn() throws RemoteException;
 
 }

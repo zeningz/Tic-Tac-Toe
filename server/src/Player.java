@@ -14,6 +14,12 @@ public class Player {
     public String getPlayerName() {
         return playerName;
     }
+    public char getSymbol() {
+        return this.symbol;
+    }
+    public void setSymbol(char symbol) {
+        this.symbol = symbol;
+    }
     public ClientInterface getClientInterface() {
         return this.clientInterface;
     }
