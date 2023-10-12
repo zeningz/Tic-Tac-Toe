@@ -5,6 +5,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.Point;
+import java.rmi.RemoteException;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -79,11 +80,18 @@ public class ClientGUI {
         connectButton.addActionListener(e -> {
             String playerName = playerNameInput.getText();
             if (!playerName.isEmpty()) {
-                String connectionResult = client.connectToServer(playerName);
-                if ("SUCCESS".equals(connectionResult)) {
-                    preGameFrame.dispose(); // 关闭 preGameFrame
-                    createGameFrame(); // 创建游戏界面
-                    gameStatusLabel.setText("Finding Player...");
+                String connectionResult = null;
+                try {
+                    connectionResult = client.connectToServer(playerName);
+                } catch (RemoteException ex) {
+                    System.err.println("Fail to Connect from client to server");
+                }
+                if ("waiting".equals(connectionResult)) {
+
+                } else if ("reconncet".equals(connectionResult)){
+
+                } else if ("play".equals(connectionResult)){
+
                 } else if ("NAME_IN_USE".equals(connectionResult)) {
                     System.out.println("name");
                     statusLabel.setText("Name already in use!");
@@ -112,8 +120,8 @@ public class ClientGUI {
 
 
     public void createGameFrame() {
-        if (preGameFrame != null) {
-            preGameFrame.dispose();
+        if (frame != null) {
+            return;
         }
 
 
@@ -185,7 +193,7 @@ public class ClientGUI {
                 boardPanel.add(boardButtons[i][j]);
             }
         }
-
+        System.out.println("board text");
         frame.add(boardPanel, BorderLayout.CENTER);
 
 
@@ -303,9 +311,14 @@ public class ClientGUI {
         chatListModel.addElement(message);
         chatList.ensureIndexIsVisible(chatListModel.size() - 1);  // Make sure the most recent message is visible
     }
-
+    public void showWaitingScreen() {
+        preGameFrame.dispose(); // 关闭 preGameFrame
+        createGameFrame(); // 创建游戏界面
+        gameStatusLabel.setText("Finding Player...");
+    }
     public void startGame() {
-
+        preGameFrame.dispose(); // 关闭 preGameFrame
+        createGameFrame();
         gameStatusLabel.setText("Game On!");  // 或其他适当的消息
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
@@ -315,26 +328,12 @@ public class ClientGUI {
         sendChatButton.setEnabled(true);
     }
 
-
-//    private void createWaitingForOpponentFrame() {
-//        waitingFrame = new JFrame("Waiting...");
-//        waitingFrame.setLayout(new FlowLayout());
-//        waitingLabel = new JLabel("Waiting for your opponent...");
-//        waitingFrame.add(waitingLabel);
-//        waitingFrame.pack();
-//        waitingFrame.setVisible(true);
-//    }
-//
-//    public void showWaitingScreen() {
-//        createWaitingForOpponentFrame();
-//    }
-//
-//    public void hideWaitingScreen() {
-//        if (waitingFrame != null) {
-//            waitingFrame.dispose();
-//        }
-//    }
-
+    public void freezeGameUI() {
+        // 禁用 boardPanel 和其他相关的 GUI 组件
+        frame.setEnabled(false);
+        // 你还可以显示一个消息，告诉玩家游戏已被暂停。
+        JOptionPane.showMessageDialog(null, "Game is paused due to opponent's disconnection.");
+    }
     public void updateBoard(char[][] board) {
         if (boardButtons == null) {
             System.out.println("boardButtons is not initialized!");
@@ -360,6 +359,7 @@ public class ClientGUI {
         this.playerName = playerName;
         this.playerSymbol = playerSymbol;
     }
+
 
 
 }

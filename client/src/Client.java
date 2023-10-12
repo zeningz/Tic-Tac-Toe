@@ -22,15 +22,32 @@ public class Client implements ClientInterface {
     private ClientGUI gui;
     private String playerName;
     private char playerSymbol;
-    private Timer heartbeatTimer;
+    private Timer heartbeatCheckTimer;
     public Client(String serverURL) {
         try {
             clientStub = (ClientInterface) UnicastRemoteObject.exportObject(this, 0);
             server = (ServerInterface) Naming.lookup(serverURL);
             gui = new ClientGUI(this);
+            startHeartbeatCheck();
         } catch (Exception e) {
+            System.err.println("Fail to init Client");
             e.printStackTrace();
         }
+    }
+    private void startHeartbeatCheck() {
+        heartbeatCheckTimer = new Timer(5000, e -> {
+            try {
+                server.heartbeat();
+            } catch (RemoteException ex) {
+                try {
+                    displayNotification("Server is disconnected. The client will close in 5 seconds.");
+                } catch (RemoteException exc) {
+                    System.err.println("Fail to display Notification");
+                }
+                new Timer(5000, evt -> System.exit(0)).start();
+            }
+        });
+        heartbeatCheckTimer.start();
     }
     @Override
     public void waitForOpponent() {
@@ -39,30 +56,38 @@ public class Client implements ClientInterface {
             JOptionPane.showMessageDialog(null, "Waiting for your opponent...");
         });
     }
+    @Override
+    public void freezeGameUI() {
+        gui.freezeGameUI();
+    }
 
+    @Override
+    public void showWaitingScreen() {
+        SwingUtilities.invokeLater(() -> {
+            // 这里你可以更新你的 GUI，例如关闭上面的对话框（如果你使用了它）并显示游戏的主界面。
+            // 如果你已经有了一个方法来显示游戏的主界面，只需在这里调用它。
+            gui.showWaitingScreen();
+        });
+    }
     @Override
     public void startGame() {
         SwingUtilities.invokeLater(() -> {
             // 这里你可以更新你的 GUI，例如关闭上面的对话框（如果你使用了它）并显示游戏的主界面。
-            // 如果你已经有了一个方法来显示游戏的主界面，只需在这里调用它。
+            //            // 如果你已经有了一个方法来显示游戏的主界面，只需在这里调用它。
             gui.startGame();
         });
     }
-    public String connectToServer(String playerName) {
+    @Override
+    public String connectToServer(String playerName) throws RemoteException {
         System.out.println("Attempting to connect with name: " + playerName);
         try {
-            if(server.setPlayer(clientStub, playerName,true)) {
-                System.out.println("ok");
-                return "SUCCESS";
-            }
-            else{
-                return "RECONNECT";
-            }
+            String result =server.setPlayer(clientStub, playerName,true);
+            return result;
         } catch (RemoteException e) {
             if (e.getMessage().contains("Name already in use across the server!")) {  // 使用contains而不是equals
                 return "NAME_IN_USE";
             } else {
-                e.printStackTrace();
+
                 return "SERVER_DISCONNECTED";
             }
         }
@@ -97,7 +122,13 @@ public class Client implements ClientInterface {
     @Override
     public void updateCurrentPlayerInfo(String playerName, char symbol, int rank) throws RemoteException {
         // 在这里，我们会使用从服务器收到的信息来更新 GUI
-        gui.updatePlayerInfo(playerName, symbol, rank);
+
+        SwingUtilities.invokeLater(() -> {
+            // 这里你可以更新你的 GUI，例如关闭上面的对话框（如果你使用了它）并显示游戏的主界面。
+            //            // 如果你已经有了一个方法来显示游戏的主界面，只需在这里调用它。
+            gui.updatePlayerInfo(playerName, symbol, rank);
+        });
+        System.out.println(this.playerName+" updateCurrentPlayerInfo");
         if (this.playerName.equals(playerName)) {
             startTimer();  // 如果这是当前客户端的玩家，启动计时器
         } else {
@@ -113,19 +144,20 @@ public class Client implements ClientInterface {
 
     public void makeMove(int row, int col) {
         stopTimer();
-        System.out.println("Entering makeMove");
+
         try {
-            System.out.println("Before calling server.makeMove");
+
             server.makeMove(clientStub, row, col);
-            System.out.println("After calling server.makeMove");
+
 
         } catch (RemoteException e) {
-            System.out.println("Exception in makeMove");
-            e.printStackTrace();
+
+            System.err.println("Fail to makeMove");
         }
-        System.out.println("Exiting makeMove");
+
 
     }
+
 
 
     @Override
@@ -139,7 +171,7 @@ public class Client implements ClientInterface {
         try {
             server.quit(clientStub);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            System.err.println("Fail to quit");
         }
     }
     public void sendMessage(String message) {
@@ -151,15 +183,14 @@ public class Client implements ClientInterface {
             // 将自己的消息添加到自己的聊天框中
             receiveMessage(formattedMessage);
         } catch (RemoteException e) {
-            System.err.println("Error sending message: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Error sending message" );
         }
     }
     public void startFindingPlayer() {
         try {
             server.setPlayer(this.clientStub, this.playerName,false);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            System.err.println("Fail to find opponent");
         }
     }
 
@@ -172,7 +203,12 @@ public class Client implements ClientInterface {
 
 
     public void updateGame(char[][] board) {
-        gui.updateBoard(board);
+
+        SwingUtilities.invokeLater(() -> {
+            // 这里你可以更新你的 GUI，例如关闭上面的对话框（如果你使用了它）并显示游戏的主界面。
+            //            // 如果你已经有了一个方法来显示游戏的主界面，只需在这里调用它。
+            gui.updateBoard(board);
+        });
     }
     @Override
     public void createGameFrame() {
@@ -189,6 +225,12 @@ public class Client implements ClientInterface {
         SwingUtilities.invokeLater(() -> gui.displayNotification(message));
     }
     public static void main(String[] args) {
-        new Client("rmi://localhost/TicTacToe");
+        if(args.length < 1) {
+            System.out.println("Usage: java Client <RMI URL>");
+            System.exit(1);
+        }
+        String rmiURL = args[0];
+        System.out.println(rmiURL);
+        new Client(rmiURL);
     }
 }

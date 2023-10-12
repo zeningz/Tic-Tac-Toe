@@ -1,6 +1,7 @@
 import share.ClientInterface;
 import share.ServerInterface;
-
+import java.rmi.registry.Registry;
+import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
@@ -22,27 +23,53 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
     private Set<String> disconnectPlayers = new HashSet<>();
 
     private Map<String, GameSession> playerToSessionMap = new HashMap<>();
-
+    private final long HEARTBEAT_INTERVAL = 5000;  // 例如，每5秒发送一次心
     private Map<ClientInterface, Timer> heartbeats = new HashMap<>();
     public TicTacToeServer() throws RemoteException {
         connectedClients = new ArrayList<>();
         activeSessions = new ArrayList<>();
+        startHeartbeat();
+    }
+    public void startHeartbeat() {
+        Timer timer = new Timer(true);
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                // 创建一个临时列表来存储断开连接的客户端
+                List<ClientInterface> disconnectedClients = new ArrayList<>();
+
+                for (Player player : allPlayers) {
+                    try {
+                        player.getClientInterface().heartbeat();
+                    } catch (RemoteException e) {
+                        disconnectedClients.add(player.getClientInterface());
+                    }
+                }
+
+                // 现在，处理所有断开连接的客户端
+                for (ClientInterface client : disconnectedClients) {
+                    handleClientDisconnection(client);
+                }
+            }
+        }, 0, HEARTBEAT_INTERVAL);
     }
 
+
     @Override
-    public synchronized boolean setPlayer(ClientInterface client, String playerName, boolean newplayer) throws RemoteException {
+    public synchronized String setPlayer(ClientInterface client, String playerName, boolean newplayer) throws RemoteException {
+
         Timer previousTimer = disconnectionTimers.remove(client);
         if (previousTimer != null) {
             previousTimer.cancel();
         }
 
 
-        System.out.println("dc"+disconnectPlayers);
+
         if (disconnectPlayers.contains(playerName)) {
             handleReconnection(client, playerName);
-            return false;  // Player successfully reconnected
+            return "reconnect";  // Player successfully reconnected
         }
-        if (newplayer && playerNames.contains(playerName)) {
+        if (newplayer && playerNames.contains(playerName) && !disconnectPlayers.contains(playerName)) {
 
             throw new RemoteException("Name already in use across the server!");
         }
@@ -54,7 +81,6 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
                 break;
             }
         }
-        System.out.println(waitingPlayer);
         if (waitingPlayer == null) {
             if (retrievedPlayer != null) {
                 waitingPlayer = retrievedPlayer;
@@ -65,7 +91,8 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
                 allPlayers.add(waitingPlayer);
                 playerNames.add(playerName);
             }
-            return true;
+            waitingPlayer.getClientInterface().showWaitingScreen();
+            return "waiting";
         } else {
             Random random = new Random();
             char playerOneSymbol = random.nextBoolean() ? 'X' : 'O';
@@ -111,32 +138,58 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
 
 
             waitingPlayer = null;
-            return true;  // 玩家已加入新的游戏会话
+            return "play";  // 玩家已加入新的游戏会话
         }
     }
-    private boolean isPlayerInAllPlayers(String playerName) {
-        for (Player p : allPlayers) {
-            if (p.getPlayerName().equals(playerName)) {
-                return true;
-            }
-        }
-        return false;
+    public boolean areBothPlayersConnected(GameSession session) {
+        Player player1 = session.getPlayer1();
+        Player player2 = session.getPlayer2();
+
+        // 如果两名玩家都不在disconnectPlayers集合中，则都已连接
+        return !disconnectPlayers.contains(player1.getPlayerName()) && !disconnectPlayers.contains(player2.getPlayerName());
     }
     private void handleReconnection(ClientInterface client, String playerName) throws RemoteException {
-        disconnectPlayers.remove(playerName);
-        GameSession sessionToRejoin = playerToSessionMap.get(playerName);
-        if (sessionToRejoin != null) {
-            // 将客户端重新加入到GameSession
-            System.out.println(playerName+"recon");
-            sessionToRejoin.reconnectPlayer(client, playerName);
 
-            // 你可能还需要其他逻辑，例如通知其他玩家，或者恢复客户端的游戏状态等
-        } else {
-            setPlayer(client, playerName, false);
-            // 这里处理当无法找到对应的GameSession的情况
+        // 1. Remove the player from disconnectPlayers list
+        disconnectPlayers.remove(playerName);
+
+
+        // 2. Remove the old ClientInterface from disconnectionTimers map
+        disconnectionTimers.remove(client);
+
+        Player reconnectingPlayer = null;
+
+        // 3. Update the ClientInterface of the reconnecting player in allPlayers list
+        for (Player player : allPlayers) {
+            if (player.getPlayerName().equals(playerName)) {
+                player.setClientInterface(client);
+                reconnectingPlayer = player; // save this player for later use
+                break;
+            }
         }
 
+        GameSession sessionToRejoin = playerToSessionMap.get(playerName);
+        if (sessionToRejoin != null) {
+            sessionToRejoin.playerReconnected(client);
+            // Reconnect the player to the GameSession
+            System.out.println(playerName + " reconnected to the game session");
+            sessionToRejoin.reconnectPlayer(client, playerName);
+        } else {
+            // Handle the case where there is no corresponding GameSession
+            if (waitingPlayer == null) {
+                // If there's no waiting player, set the reconnecting player as waitingPlayer
+                waitingPlayer = reconnectingPlayer;
+                waitingPlayer.getClientInterface().showWaitingScreen();
+            } else {
+                // If there's a waiting player, start a new game session
+                setPlayer(client, playerName, false);
+            }
+        }
     }
+
+
+
+
     private Player findPlayerByClientInterface(ClientInterface client) {
         for (Player p : allPlayers) {
             if (p.getClientInterface().equals(client)) {
@@ -148,18 +201,51 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
 
     public void handleClientDisconnection(ClientInterface client) {
         Player disconnectingPlayer = findPlayerByClientInterface(client);
+
+        if (waitingPlayer != null && waitingPlayer.equals(disconnectingPlayer)) {
+            waitingPlayer = null;
+        }
+
         if (disconnectingPlayer != null) {
             disconnectPlayers.add(disconnectingPlayer.getPlayerName());
+
+            GameSession affectedSession = playerToSessionMap.get(disconnectingPlayer.getPlayerName());
+            if (affectedSession != null) {
+                affectedSession.playerDisconnected(client);
+            }
+
             Timer timer = new Timer();
             timer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    disconnectPlayers.remove(disconnectingPlayer.getPlayerName());
+                    if (disconnectPlayers.contains(disconnectingPlayer.getPlayerName())) {
+                        // 如果玩家在30秒内未重新连接
+                        disconnectPlayers.remove(disconnectingPlayer.getPlayerName());
+
+                        // 检查是否有与此玩家关联的GameSession
+                        GameSession sessionToCheck = playerToSessionMap.get(disconnectingPlayer.getPlayerName());
+                        if (sessionToCheck != null) {
+                            // 将此对局标记为平局，并通知游戏中的另一名玩家
+                            Player otherPlayer = sessionToCheck.getOtherPlayer(disconnectingPlayer);
+                            try {
+                                otherPlayer.getClientInterface().heartbeat();  // 或其他简单的远程方法
+                                otherPlayer.getClientInterface().gameEnded("The game is a draw because " + disconnectingPlayer.getPlayerName() + " did not reconnect in time.");
+                            } catch (RemoteException e) {
+                                System.err.println("Other player is offline");
+                            }
+                            // 从活跃会话中移除这个GameSession
+                            activeSessions.remove(sessionToCheck);
+                            playerToSessionMap.remove(disconnectingPlayer.getPlayerName());
+                            playerToSessionMap.remove(otherPlayer.getPlayerName());
+                        }
+                    }
                 }
             }, 30000);  // 30 seconds
             disconnectionTimers.put(client, timer);
         }
     }
+
+
 
 
     public void gameFinished(GameSession session) throws RemoteException {
@@ -170,8 +256,7 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
     }
 
     public int getRankOfPlayer(Player player) {
-        System.out.println(allPlayers);
-        System.out.println(playerNames);
+
         List<Player> sortedPlayers = new ArrayList<>(allPlayers);
 
         sortedPlayers.sort((p1, p2) -> {
@@ -185,10 +270,6 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
     }
 
 
-
-    public void removeGameSession(GameSession session) {
-        activeSessions.remove(session);
-    }
 
     @Override
     public void quit(ClientInterface client) throws RemoteException {
@@ -210,6 +291,10 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
             }
         }
 
+        if (waitingPlayer != null && waitingPlayer.equals(quittingPlayer)) {
+            waitingPlayer = null;
+        }
+
         if (quittingSession != null) {
             // Find the other player in the session
             Player otherPlayer = (quittingPlayer == quittingSession.getPlayer1()) ? quittingSession.getPlayer2() : quittingSession.getPlayer1();
@@ -226,27 +311,37 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
             allPlayers.remove(quittingPlayer);
             playerNames.remove(quittingPlayer.getPlayerName());
         }
+
     }
 
 
 
     @Override
     public void makeMove(ClientInterface client, int row, int col) throws RemoteException {
-        GameSession session = findSessionByPlayer(client);
-        Player currentplayer = session.getCurrentPlayer();
-        char symbol = currentplayer.getSymbol();
-        try{
-            session.getPlayer1().getClientInterface().heartbeat();
-        }catch (RemoteException e){
-            handleClientDisconnection(session.getPlayer1().getClientInterface());
-        }
-        try{
-            session.getPlayer2().getClientInterface().heartbeat();
-        }catch (RemoteException e){
-            handleClientDisconnection(session.getPlayer2().getClientInterface());
-        }
+        try {
+            GameSession session = findSessionByPlayer(client);
+            if (session.isFrozen()) {
+                client.displayNotification("The game is currently frozen due to a disconnected player.");
+                return;
+            }
+            if (session == null) {
+                client.displayNotification("No active game session found for this player. Please reconnect.");
+                return;
+            }
 
-        if (session != null) {
+            Player currentplayer = session.getCurrentPlayer();
+            char symbol = currentplayer.getSymbol();
+            try {
+                session.getPlayer1().getClientInterface().heartbeat();
+            } catch (RemoteException e) {
+                handleClientDisconnection(session.getPlayer1().getClientInterface());
+            }
+            try {
+                session.getPlayer2().getClientInterface().heartbeat();
+            } catch (RemoteException e) {
+                handleClientDisconnection(session.getPlayer2().getClientInterface());
+            }
+
             Player player = findPlayerByClient(client, session);
             Player nextPlayer = session.makeMove(player, row, col);  // 获取返回的玩家
             int rank = getRankOfPlayer(nextPlayer);
@@ -255,9 +350,14 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
             Player otherPlayer = (nextPlayer == session.getPlayer1()) ? session.getPlayer2() : session.getPlayer1();
             nextPlayer.getClientInterface().updateCurrentPlayerInfo(nextPlayer.getPlayerName(), nextPlayer.getSymbol(), rank);
             otherPlayer.getClientInterface().updateCurrentPlayerInfo(nextPlayer.getPlayerName(), nextPlayer.getSymbol(), rank);
-        }
+        }catch (RemoteException e) {
+            System.err.println("RemoteException occurred: you may lost connect please try to reconnect");
+        } catch (Exception e) {
+            System.err.println("An error occurred: do not move on others turn");
 
+        }
     }
+
 
 
 
@@ -279,14 +379,14 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
     }
 
 
-    @Override
-    public char[][] getBoard(ClientInterface client) {
-        // TODO: Implement board retrieval.
-        return null;
-    }
+
     @Override
     public void sendMessage(ClientInterface sender, String message) throws RemoteException {
         GameSession game = findSessionByPlayer(sender);
+        if (game.isFrozen()) {
+            sender.displayNotification("The game is currently frozen due to a disconnected player.");
+            return;
+        }
         Player currentplayer = game.getCurrentPlayer();
         char symbol = currentplayer.getSymbol();
         try{
@@ -311,23 +411,54 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
             }
         }
     }
-
-
-
-
-
-
-
-    public void start() {
-        // TODO: RMI registry initialization and other server setup.
+    @Override
+    public void heartbeat() {
     }
-    public static void main(String[] args) {
+
+
+
+
+
+
+    public void start(String rmiUrl) {
         try {
-            TicTacToeServer server = new TicTacToeServer();
-            server.start();
-        } catch (RemoteException e) {
+            // Bind the remote object's stub in the registry
+            Registry registry = LocateRegistry.getRegistry();
+
+            // Add a debug print statement before rebind
+            System.out.println("Attempting to bind to RMI registry with URL: " + rmiUrl);
+
+            registry.rebind(rmiUrl, this);
+
+            // Add another debug print statement after rebind to confirm success
+            System.out.println("Successfully bound to RMI registry.");
+
+            System.out.println("Server ready");
+        } catch (Exception e) {
+            System.err.println("Server init error");
             e.printStackTrace();
         }
     }
+
+    public static void main(String[] args) {
+        if (args.length < 1) {
+            System.out.println("Usage: java YourServerClass <rmi-url>");
+            return;
+        }
+
+        String rmiUrl = args[0];
+
+        try {
+            Registry registry = LocateRegistry.createRegistry(1099);
+
+            TicTacToeServer server = new TicTacToeServer();
+            server.start(rmiUrl);
+        } catch (RemoteException e) {
+            System.err.println("Server init error");
+            e.printStackTrace();
+        }
+    }
+
+
 
 }

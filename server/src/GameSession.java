@@ -1,6 +1,5 @@
 import java.rmi.RemoteException;
 import share.ClientInterface;
-import share.ServerInterface;
 
 public class GameSession {
     private Player player1;
@@ -9,6 +8,7 @@ public class GameSession {
     private Player currentPlayer;
     private TicTacToeServer server;
 
+    private boolean isFrozen = false;
     public GameSession(Player p1, Player p2,TicTacToeServer server) {
         this.player1 = p1;
         this.player2 = p2;
@@ -44,7 +44,12 @@ public class GameSession {
     private final Object moveLock = new Object();
 
     public synchronized Player makeMove(Player player, int row, int col) throws RemoteException {
+
         synchronized(moveLock) {
+            if (isFrozen) {
+                // 不执行移动，返回错误消息
+                return null;
+            }
             if (player != currentPlayer) {
                 return null;
             }
@@ -55,7 +60,7 @@ public class GameSession {
             try {
                 Thread.sleep(100);  // 延迟100毫秒
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                System.err.println("Fail to move, Check gamesession");
             }
 
 
@@ -83,20 +88,27 @@ public class GameSession {
 
         }
     }
-    public void endGameAsDraw() throws RemoteException {
-        player1.addPoints(2); // 平局，每个玩家得到2分
-        player2.addPoints(2);
-        gameState = GameState.FINISHED;
-        updateClientsBoard();
-        notifyPlayers("It's a draw due to disconnection!");
-    }
 
+    public boolean isFrozen() {
+        return isFrozen;
+    }
+    public void playerReconnected(ClientInterface client) {
+        if (server.areBothPlayersConnected(this)) { // 判断两个玩家是否都已连接
+            isFrozen = false;
+        }
+    }
+    public Player getOtherPlayer(Player currentPlayer) {
+        return currentPlayer.equals(player1) ? player2 : (currentPlayer.equals(player2) ? player1 : null);
+    }
+    public void playerDisconnected(ClientInterface client) {
+        isFrozen = true;
+    }
     private void notifyPlayers(String message) throws RemoteException{
         Thread t1 = new Thread(() -> {
             try {
                 player1.getClientInterface().gameEnded(message);
             } catch (RemoteException e) {
-                e.printStackTrace();
+                System.err.println("Fail to notifyPlayers "+player1);
             }
         });
 
@@ -104,7 +116,7 @@ public class GameSession {
             try {
                 player2.getClientInterface().gameEnded(message);
             } catch (RemoteException e) {
-                e.printStackTrace();
+                System.err.println("Fail to notifyPlayers "+player2);
             }
         });
 
@@ -115,39 +127,10 @@ public class GameSession {
             t1.join();
             t2.join();
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            System.err.println("Fail to use thread");
         }
     }
 
-    private boolean isGameFinished() {
-        // Check for a winning line
-        for (int i = 0; i < 3; i++) {
-            if (board[i][0] != ' ' && board[i][0] == board[i][1] && board[i][0] == board[i][2]) {
-                return true; // row win
-            }
-            if (board[0][i] != ' ' && board[0][i] == board[1][i] && board[0][i] == board[2][i]) {
-                return true; // column win
-            }
-        }
-        // Check diagonals
-        if (board[0][0] != ' ' && board[0][0] == board[1][1] && board[0][0] == board[2][2]) {
-            return true; // top-left to bottom-right diagonal
-        }
-        if (board[0][2] != ' ' && board[0][2] == board[1][1] && board[0][2] == board[2][0]) {
-            return true; // top-right to bottom-left diagonal
-        }
-
-        // Check for a tie (full board without a winner)
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                if (board[i][j] == ' ') { // found an empty spot
-                    return false;
-                }
-            }
-        }
-        // It's a tie if the board is full and there's no winner
-        return true;
-    }
 
     public boolean isWinner(char symbol) {
         // 检查行、列和对角线
@@ -184,13 +167,13 @@ public class GameSession {
         System.out.println("startGame");
         updateClientsBoard();
     }
-    public Player getPlayer1() throws RemoteException{
+    public Player getPlayer1(){
         return player1;
     }
-    public Player getCurrentPlayer() throws RemoteException {
+    public Player getCurrentPlayer() {
         return currentPlayer;
     }
-    public Player getPlayer2() throws RemoteException {
+    public Player getPlayer2() {
         return player2;
     }
 
@@ -200,14 +183,11 @@ public class GameSession {
             // Assuming you have a method in your server interface to handle game session end.
             server.gameFinished(this);
         } catch (RemoteException e) {
-            System.err.println("Error notifying server about game finish: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Error notifying server about game finish");
+
         }
     }
-    public String outcome() {
-        // TODO: Check game outcome.
-        return null;
-    }
+
     public char[][] getBoardState() throws RemoteException{
         // 假设你有一个char[][]来代表棋盘状态
         return this.board;
@@ -224,11 +204,11 @@ public class GameSession {
         char[][] boardState = getBoardState();
         Player currentPlayer = getCurrentPlayer();
         int rank = server.getRankOfPlayer(currentPlayer);
-
         // 更新重连玩家的游戏状态
         client.updateGame(boardState);
-        client.updateCurrentPlayerInfo(currentPlayer.getPlayerName(), currentPlayer.getSymbol(), rank);
+        client.setPlayerDetails(playerToReconnect.getPlayerName(), playerToReconnect.getSymbol());
 
+        client.updateCurrentPlayerInfo(currentPlayer.getPlayerName(), currentPlayer.getSymbol(), rank);
         // 同时更新其他玩家的游戏状态
         otherPlayer.getClientInterface().updateGame(boardState);
         otherPlayer.getClientInterface().updateCurrentPlayerInfo(currentPlayer.getPlayerName(), currentPlayer.getSymbol(), rank);

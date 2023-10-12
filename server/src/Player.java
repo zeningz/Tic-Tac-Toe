@@ -1,7 +1,5 @@
 import share.ClientInterface;
 
-import java.rmi.RemoteException;
-
 public class Player {
     private String playerName;
     private char symbol;
@@ -30,13 +28,7 @@ public class Player {
         this.symbol = symbol;
     }
 
-    public void notifyGameResult(String message) {
-        try {
-            clientInterface.displayNotification(message);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
-    }
+
 
     public ClientInterface getClientInterface() {
         return this.clientInterface;
@@ -52,5 +44,4 @@ public class Player {
         return this.points;
     }
 
-    // TODO: Add getters, setters, and other necessary methods.
 }
