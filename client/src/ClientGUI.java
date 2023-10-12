@@ -193,7 +193,6 @@ public class ClientGUI {
                 boardPanel.add(boardButtons[i][j]);
             }
         }
-        System.out.println("board text");
         frame.add(boardPanel, BorderLayout.CENTER);
 
 

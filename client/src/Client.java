@@ -205,8 +205,7 @@ public class Client implements ClientInterface {
     public void updateGame(char[][] board) {
 
         SwingUtilities.invokeLater(() -> {
-            // 这里你可以更新你的 GUI，例如关闭上面的对话框（如果你使用了它）并显示游戏的主界面。
-            //            // 如果你已经有了一个方法来显示游戏的主界面，只需在这里调用它。
+
             gui.updateBoard(board);
         });
     }
@@ -232,5 +231,6 @@ public class Client implements ClientInterface {
         String rmiURL = args[0];
         System.out.println(rmiURL);
         new Client(rmiURL);
+//        new Client("rmi://localhost/TicTacToe");
     }
 }

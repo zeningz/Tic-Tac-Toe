@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.rmi.Naming;
+
 public class TicTacToeServer extends UnicastRemoteObject implements ServerInterface {
     private List<ClientInterface> connectedClients;
     private List<GameSession> activeSessions;
@@ -428,7 +430,7 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
             // Add a debug print statement before rebind
             System.out.println("Attempting to bind to RMI registry with URL: " + rmiUrl);
 
-            registry.rebind(rmiUrl, this);
+            Naming.rebind(rmiUrl, this);
 
             // Add another debug print statement after rebind to confirm success
             System.out.println("Successfully bound to RMI registry.");
@@ -449,9 +451,9 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
         String rmiUrl = args[0];
 
         try {
-            Registry registry = LocateRegistry.createRegistry(1099);
 
             TicTacToeServer server = new TicTacToeServer();
+            System.out.println(server);
             server.start(rmiUrl);
         } catch (RemoteException e) {
             System.err.println("Server init error");
