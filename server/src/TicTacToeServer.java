@@ -93,6 +93,7 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
                 allPlayers.add(waitingPlayer);
                 playerNames.add(playerName);
             }
+            waitingPlayer.getClientInterface().setPlayerDetails(waitingPlayer.getPlayerName(), waitingPlayer.getSymbol());
             waitingPlayer.getClientInterface().showWaitingScreen();
             return "waiting";
         } else {
@@ -172,10 +173,11 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
 
         GameSession sessionToRejoin = playerToSessionMap.get(playerName);
         if (sessionToRejoin != null) {
-            sessionToRejoin.playerReconnected(client);
+
             // Reconnect the player to the GameSession
             System.out.println(playerName + " reconnected to the game session");
             sessionToRejoin.reconnectPlayer(client, playerName);
+            sessionToRejoin.playerReconnected(client);
         } else {
             // Handle the case where there is no corresponding GameSession
             if (waitingPlayer == null) {
@@ -256,7 +258,14 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
         activeSessions.remove(session);
 
     }
-
+    @Override
+    public int getRankOfClient(ClientInterface client) throws RemoteException {
+        Player p = findPlayerByClientInterface(client);
+        if (p != null) {
+            return getRankOfPlayer(p);
+        }
+        return -1; // 返回-1表示错误或玩家未找到
+    }
     public int getRankOfPlayer(Player player) {
 
         List<Player> sortedPlayers = new ArrayList<>(allPlayers);
@@ -318,8 +327,7 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
 
 
 
-    @Override
-    public void makeMove(ClientInterface client, int row, int col) throws RemoteException {
+    public void makeMove(ClientInterface client, int row, int col) {
         try {
             GameSession session = findSessionByPlayer(client);
             if (session.isFrozen()) {
@@ -352,13 +360,15 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
             Player otherPlayer = (nextPlayer == session.getPlayer1()) ? session.getPlayer2() : session.getPlayer1();
             nextPlayer.getClientInterface().updateCurrentPlayerInfo(nextPlayer.getPlayerName(), nextPlayer.getSymbol(), rank);
             otherPlayer.getClientInterface().updateCurrentPlayerInfo(nextPlayer.getPlayerName(), nextPlayer.getSymbol(), rank);
-        }catch (RemoteException e) {
-            System.err.println("RemoteException occurred: you may lost connect please try to reconnect");
         } catch (Exception e) {
-            System.err.println("An error occurred: do not move on others turn");
-
+            try {
+                client.displayNotification("An error occurred");
+            } catch (RemoteException re) {
+                System.err.println("Failed to send error notification to client" );
+            }
         }
     }
+
 
 
 
@@ -437,8 +447,7 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
 
             System.out.println("Server ready");
         } catch (Exception e) {
-            System.err.println("Server init error");
-            e.printStackTrace();
+            System.err.println("Server init error, fall to init rmi");
         }
     }
 
@@ -453,11 +462,9 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
         try {
 
             TicTacToeServer server = new TicTacToeServer();
-            System.out.println(server);
             server.start(rmiUrl);
         } catch (RemoteException e) {
             System.err.println("Server init error");
-            e.printStackTrace();
         }
     }
 

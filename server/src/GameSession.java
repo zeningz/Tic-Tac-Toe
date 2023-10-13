@@ -164,7 +164,6 @@ public class GameSession {
 
 
     public void startGame() throws RemoteException {
-        System.out.println("startGame");
         updateClientsBoard();
     }
     public Player getPlayer1(){

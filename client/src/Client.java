@@ -31,7 +31,7 @@ public class Client implements ClientInterface {
             startHeartbeatCheck();
         } catch (Exception e) {
             System.err.println("Fail to init Client");
-            e.printStackTrace();
+//            e.printStackTrace();
         }
     }
     private void startHeartbeatCheck() {
@@ -117,23 +117,27 @@ public class Client implements ClientInterface {
         Random rand = new Random();
         Point randomMove = availableMoves.get(rand.nextInt(availableMoves.size()));
         makeMove(randomMove.x, randomMove.y);
+        try {
+            displayNotification("You took too long. A random move has been made for you.");
+        }catch (RemoteException e){
+            System.err.println("Failed to send notification to client");
+        }
     }
 
     @Override
     public void updateCurrentPlayerInfo(String playerName, char symbol, int rank) throws RemoteException {
         // 在这里，我们会使用从服务器收到的信息来更新 GUI
-
         SwingUtilities.invokeLater(() -> {
             // 这里你可以更新你的 GUI，例如关闭上面的对话框（如果你使用了它）并显示游戏的主界面。
             //            // 如果你已经有了一个方法来显示游戏的主界面，只需在这里调用它。
             gui.updatePlayerInfo(playerName, symbol, rank);
         });
-        System.out.println(this.playerName+" updateCurrentPlayerInfo");
         if (this.playerName.equals(playerName)) {
             startTimer();  // 如果这是当前客户端的玩家，启动计时器
         } else {
             stopTimer();   // 否则停止计时器
         }
+
     }
     private void stopTimer() {
         if (moveTimer != null) {
@@ -176,14 +180,14 @@ public class Client implements ClientInterface {
     }
     public void sendMessage(String message) {
         try {
-            System.out.println("Attempting to send message: " + message);
-            String formattedMessage = this.playerName + ": " + message;
+            int rank = server.getRankOfClient(clientStub);
+            String formattedMessage = this.playerName + " (rank: "+ rank + " ): " + message;
             server.sendMessage(clientStub, formattedMessage);
 
             // 将自己的消息添加到自己的聊天框中
             receiveMessage(formattedMessage);
         } catch (RemoteException e) {
-            System.err.println("Error sending message" );
+            System.err.println("Error sending message");
         }
     }
     public void startFindingPlayer() {
@@ -197,7 +201,6 @@ public class Client implements ClientInterface {
 
 
     public void receiveMessage(String message) {
-        System.out.println("Received message: " + message);
         gui.updateChat(message);
     }
 

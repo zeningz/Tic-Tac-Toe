@@ -15,22 +15,15 @@ public class ClientGUI {
     private Client client;
     private JFrame frame;
     private JButton[][] boardButtons;
-    private JTextArea chatArea;
-    private JTextField chatInput;
-    private JButton sendButton;
     private JButton quitButton;
     private JLabel statusLabel;
     private JLabel timerLabel;
 
-    private JLabel playerInfoLabel;
-    private Timer timer;
     private JFrame preGameFrame;
     private JLabel gameStatusLabel;
     private JTextField playerNameInput;
     private JButton connectButton;
-//    private JLabel errorMessageLabel;
-    private JFrame waitingFrame;
-    private JLabel waitingLabel;
+
     private JPanel topPanel;
     private JLabel rankLabel;
     private JLabel turnLabel;
@@ -93,7 +86,7 @@ public class ClientGUI {
                 } else if ("play".equals(connectionResult)){
 
                 } else if ("NAME_IN_USE".equals(connectionResult)) {
-                    System.out.println("name");
+
                     statusLabel.setText("Name already in use!");
                 } else if ("SERVER_DISCONNECTED".equals(connectionResult)) {
                     statusLabel.setText("Disconnected from server!");
@@ -125,7 +118,7 @@ public class ClientGUI {
         }
 
 
-        frame = new JFrame("Tic Tac Toe");
+        frame = new JFrame("Tic Tac Toe " + playerName);
         frame.setSize(800, 600);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setLayout(new BorderLayout());
@@ -179,13 +172,13 @@ public class ClientGUI {
                 boardButtons[i][j].addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        System.out.println("Button clicked!");
+
 
                         JButton clickedButton = (JButton) e.getSource();
-                        System.out.println("Button text: " + clickedButton.getText());
+
 
                         if (clickedButton.getText().equals("")) { // 确保该格子还没有被下过棋
-                            System.out.println("Button clicked at position: " + x + "," + y);
+
                             client.makeMove(x, y); // 告诉Client类的实例玩家在(x, y)位置下了一步棋
                         }
                     }
