@@ -1,5 +1,6 @@
 import java.awt.*;
 import java.rmi.Naming;
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 
 import share.ClientInterface;
@@ -10,6 +11,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.JOptionPane;
 import javax.swing.Timer;
 import java.util.List;
+import java.net.MalformedURLException;
 
 
 public class Client implements ClientInterface {
@@ -26,13 +28,26 @@ public class Client implements ClientInterface {
     public Client(String serverURL) {
         try {
             clientStub = (ClientInterface) UnicastRemoteObject.exportObject(this, 0);
-            server = (ServerInterface) Naming.lookup(serverURL);
-            gui = new ClientGUI(this);
-            startHeartbeatCheck();
-        } catch (Exception e) {
-            System.err.println("Fail to init Client");
-//            e.printStackTrace();
+        } catch (RemoteException e) {
+            System.err.println("Error while exporting client object");
+            return;
         }
+
+        try {
+            server = (ServerInterface) Naming.lookup(serverURL);
+        } catch (MalformedURLException e) {
+            System.err.println("The provided server URL is malformed. Please check your input.");
+            return;
+        } catch (NotBoundException e) {
+            System.err.println("Server not found at the specified URL.");
+            return;
+        } catch (RemoteException e) {
+            System.err.println("Remote exception while connecting to the server.");
+            return;
+        }
+
+        gui = new ClientGUI(this);
+        startHeartbeatCheck();
     }
     private void startHeartbeatCheck() {
         heartbeatCheckTimer = new Timer(5000, e -> {

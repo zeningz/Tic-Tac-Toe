@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.rmi.Naming;
+import java.net.MalformedURLException;
 
 public class TicTacToeServer extends UnicastRemoteObject implements ServerInterface {
     private List<ClientInterface> connectedClients;
@@ -331,7 +332,7 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
         try {
             GameSession session = findSessionByPlayer(client);
             if (session.isFrozen()) {
-                client.displayNotification("The game is currently frozen due to a disconnected player.");
+                client.displayNotification("The game is currently frozen due to a disconnected player. If the player doesn't reconnect within 30 seconds, the game will be declared a draw.");
                 return;
             }
             if (session == null) {
@@ -446,8 +447,10 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
             System.out.println("Successfully bound to RMI registry.");
 
             System.out.println("Server ready");
-        } catch (Exception e) {
-            System.err.println("Server init error, fall to init rmi");
+        } catch (RemoteException e) {
+            System.err.println("Remote exception while binding to RMI registry");
+        } catch (MalformedURLException e) {
+            System.err.println("The provided RMI URL is malformed. Please check your input.");
         }
     }
 
@@ -460,13 +463,13 @@ public class TicTacToeServer extends UnicastRemoteObject implements ServerInterf
         String rmiUrl = args[0];
 
         try {
-
             TicTacToeServer server = new TicTacToeServer();
             server.start(rmiUrl);
         } catch (RemoteException e) {
-            System.err.println("Server init error");
+            System.err.println("Server init error. Please ensure RMI setup is correct.");
         }
     }
+
 
 
 
