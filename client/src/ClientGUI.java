@@ -8,10 +8,12 @@ import java.awt.Point;
 import java.rmi.RemoteException;
 import java.util.List;
 import java.util.ArrayList;
-
-import java.util.Random;
-
+/**
+ * This class represents the GUI for the Tic Tac Toe client.
+ * It provides the interface through which the user interacts with the game.
+ */
 public class ClientGUI {
+    // Instance variables representing the client, frame, game board and other components.
     private Client client;
     private JFrame frame;
     private JButton[][] boardButtons;
@@ -35,16 +37,23 @@ public class ClientGUI {
 
     private String playerName;
     private char playerSymbol;
-    public ClientGUI(Client client) {
+    /**
+     * Constructor for the ClientGUI class.
+     * @param client - The client instance.
+     * @param username - The name of the user.
+     */
+    public ClientGUI(Client client, String username) {
         this.client = client;
-        createPreGameFrame();
+        createPreGameFrame(username);
     }
-
-    private void createPreGameFrame() {
+    /**
+     * This method creates the initial frame where users input their name and connect to the game.
+     */
+    private void createPreGameFrame(String username) {
         preGameFrame = new JFrame("Enter Player Name");
         preGameFrame.setLayout(new FlowLayout());
-
-        playerNameInput = new JTextField(20);
+        playerNameInput = new JTextField(username, 20); // 设置文本框的初始文本为 username
+        playerNameInput.setEditable(false);
         connectButton = new JButton("Connect");
 //        errorMessageLabel = new JLabel("");
         statusLabel = new JLabel("");  // Move this line up before adding to preGameFrame
@@ -98,20 +107,29 @@ public class ClientGUI {
         });
 
     }
-
+    /**
+     * Display error message dialogs.
+     */
     public void displayError(String message) {
         JOptionPane.showMessageDialog(frame, message, "Error", JOptionPane.ERROR_MESSAGE);
     }
+    /**
+     * Update the displayed timer with the remaining seconds for the player's move.
+     */
     public void updateTimer(int seconds) {
         timerLabel.setText("Time: " + seconds);
-        timerLabel.repaint(); // 确保标签得到重新绘制
+        timerLabel.repaint();
     }
-
+    /**
+     * Update the label to indicate whose turn it is.
+     */
     public void updatePlayerTurn(String playerName) {
         turnLabel.setText("Player '" + playerName + "'s Turn");
     }
 
-
+    /**
+     * Create the main game frame with the Tic Tac Toe board, chat, and other components.
+     */
     public void createGameFrame() {
         if (frame != null) {
             return;
@@ -177,9 +195,9 @@ public class ClientGUI {
                         JButton clickedButton = (JButton) e.getSource();
 
 
-                        if (clickedButton.getText().equals("")) { // 确保该格子还没有被下过棋
+                        if (clickedButton.getText().equals("")) {
 
-                            client.makeMove(x, y); // 告诉Client类的实例玩家在(x, y)位置下了一步棋
+                            client.makeMove(x, y);
                         }
                     }
                 });
@@ -240,16 +258,22 @@ public class ClientGUI {
 
         frame.setVisible(true);
     }
+    /**
+     * Reset the timer display.
+     */
     public void updateTimeLeft() {
-        // 更新timeLabel的文本以显示剩余的时间
+
         timerLabel.setText("Time: 20");
     }
+    /**
+     * Get the list of available moves (empty spots) on the board.
+     */
     public List<Point> getAvailableMoves() {
         List<Point> availableMoves = new ArrayList<>();
 
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                // 假设一个未被点击的按钮的文本是空的
+
                 if (boardButtons[i][j].getText().equals("")) {
                     availableMoves.add(new Point(i, j));
                 }
@@ -258,10 +282,15 @@ public class ClientGUI {
 
         return availableMoves;
     }
-
+    /**
+     * Display a notification dialog with the specified message.
+     */
     public void displayNotification(String message) {
         JOptionPane.showMessageDialog(frame, message, "Game Result", JOptionPane.INFORMATION_MESSAGE);
     }
+    /**
+     * Prompt the player when a game ends, asking if they want to play again.
+     */
     public void gameEndedPrompt(String winnerMessage) {
         SwingUtilities.invokeLater(() -> {
             String message = winnerMessage + "\nDo you want to play again?";
@@ -277,6 +306,9 @@ public class ClientGUI {
             }
         });
     }
+    /**
+     * Begin the process of finding another player for a new game.
+     */
     public void startFindingPlayer() {
         if (frame != null) {
             frame.dispose();  // Close the game frame
@@ -286,7 +318,9 @@ public class ClientGUI {
         gameStatusLabel.setText("Finding Player...");  // Update the status
         client.startFindingPlayer();  // Notify the server to start finding another player
     }
-
+    /**
+     * Update player information in the GUI.
+     */
     public void updatePlayerInfo(String playerName, char playerSymbol, int rank) {
         SwingUtilities.invokeLater(() -> {
             rankLabel.setText("Rank #" + rank + " '" + playerName + "' (" + playerSymbol + ")");
@@ -295,23 +329,31 @@ public class ClientGUI {
         });
     }
 
-
+    /**
+     * Append a message to the chat window.
+     */
     public void updateChat(String message) {
         if (chatListModel.size() >= 10) {
             chatListModel.remove(0);
         }
         chatListModel.addElement(message);
-        chatList.ensureIndexIsVisible(chatListModel.size() - 1);  // Make sure the most recent message is visible
+        chatList.ensureIndexIsVisible(chatListModel.size() - 1);
     }
+    /**
+     * Display the waiting screen (while searching for another player).
+     */
     public void showWaitingScreen() {
-        preGameFrame.dispose(); // 关闭 preGameFrame
-        createGameFrame(); // 创建游戏界面
+        preGameFrame.dispose();
+        createGameFrame();
         gameStatusLabel.setText("Finding Player...");
     }
+    /**
+     * Begin the actual game.
+     */
     public void startGame() {
-        preGameFrame.dispose(); // 关闭 preGameFrame
+        preGameFrame.dispose();
         createGameFrame();
-        gameStatusLabel.setText("Game On!");  // 或其他适当的消息
+        gameStatusLabel.setText("Game On!");
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
                 boardButtons[i][j].setEnabled(true);
@@ -319,13 +361,16 @@ public class ClientGUI {
         }
         sendChatButton.setEnabled(true);
     }
-
+    /**
+     * Freeze the game UI, typically due to a player's disconnection.
+     */
     public void freezeGameUI() {
-        // 禁用 boardPanel 和其他相关的 GUI 组件
         frame.setEnabled(false);
-        // 你还可以显示一个消息，告诉玩家游戏已被暂停。
         JOptionPane.showMessageDialog(null, "Game is paused due to opponent's disconnection.");
     }
+    /**
+     * Update the state of the game board based on the provided board data.
+     */
     public void updateBoard(char[][] board) {
         if (boardButtons == null) {
             System.out.println("boardButtons is not initialized!");
@@ -345,13 +390,13 @@ public class ClientGUI {
             }
         }
     }
-
+    /**
+     * Set the player's name and symbol for this GUI instance.
+     */
 
     public void setPlayerInfo(String playerName, char playerSymbol) {
         this.playerName = playerName;
         this.playerSymbol = playerSymbol;
     }
-
-
 
 }
